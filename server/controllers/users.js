@@ -4,29 +4,40 @@
  * Module dependencies.
  */
 var mongoose = require('mongoose'),
-    User = mongoose.model('User');
+    User = mongoose.model('User'),
+    Q = require('q');
 
 /**
  * Auth callback
  */
-exports.authCallback = function(req, res) {
+exports.authCallback = function (req, res) {
     res.redirect('/');
 };
 
 /**
  * Show login form
  */
-exports.signin = function(req, res) {
-    if(req.isAuthenticated()) {
-        return res.redirect('/');
-    }
-    res.redirect('#!/login');
+exports.signin = function (req, res) {
+    res.render('users/signin', {
+        title: 'Signin',
+        message: req.flash('error')
+    });
+};
+
+/**
+ * Show sign up form
+ */
+exports.signup = function (req, res) {
+    res.render('users/signup', {
+        title: 'Sign up',
+        user: new User()
+    });
 };
 
 /**
  * Logout
  */
-exports.signout = function(req, res) {
+exports.signout = function (req, res) {
     req.logout();
     res.redirect('/');
 };
@@ -34,70 +45,89 @@ exports.signout = function(req, res) {
 /**
  * Session
  */
-exports.session = function(req, res) {
+exports.session = function (req, res) {
     res.redirect('/');
 };
 
 /**
  * Create user
  */
-exports.create = function(req, res, next) {
+exports.create = function (req, res, next) {
     var user = new User(req.body);
+    var message = null;
 
-    user.provider = 'local';
-
-    // because we set our user.provider to local our models/user.js validation will always be true
-    req.assert('email', 'You must enter a valid email address').isEmail();
-    req.assert('password', 'Password must be between 8-20 characters long').len(8, 20);
-    req.assert('username', 'Username cannot be more than 20 characters').len(1,20);
-    req.assert('confirmPassword', 'Passwords do not match').equals(req.body.password);
-
-    var errors = req.validationErrors();
-    if (errors) {
-        return res.status(400).send(errors);
-    }
-
-    // Hard coded for now. Will address this with the user permissions system in v0.3.5
-    user.roles = ['authenticated'];
-    user.save(function(err) {
-        if (err) {
+    user.setPassword(req.body.password)
+        .then(function () {
+            console.log(user);
+            crypto.randomBytes(48, function (ex, buf) {
+                var token = buf.toString('hex');
+                user.token = token;
+            });
+            return Q.ninvoke(user, 'save');
+        })
+        .fail(function (err) {
             switch (err.code) {
                 case 11000:
                 case 11001:
-                    res.status(400).send('Username already taken');
+                    message = 'email already exists';
                     break;
                 default:
-                    res.status(400).send('Please fill all the required fields');
+                    message = err.message;
             }
 
-            return res.status(400);
-        }
-        req.logIn(user, function(err) {
-            if (err) return next(err);
+            return res.render('users/signup', {
+                message: message,
+                user: user
+            });
+        }).then(function(){
+            return Q.ninvoke(user, 'addToNeo');
+        })
+        .then(function () {
+            return Q.ninvoke(req, 'logIn', user);
+        })
+        .then(function () {
             return res.redirect('/');
-        });
-        res.status(200);
-    });
+        })
+        .fail(next)
+        .done();
 };
+
 /**
  * Send User
  */
-exports.me = function(req, res) {
+exports.me = function (req, res) {
     res.jsonp(req.user || null);
 };
 
 /**
  * Find user by id
  */
-exports.user = function(req, res, next, id) {
+exports.user = function (req, res, next, id) {
     User
         .findOne({
             _id: id
         })
-        .exec(function(err, user) {
+        .exec(function (err, user) {
             if (err) return next(err);
             if (!user) return next(new Error('Failed to load User ' + id));
             req.profile = user;
             next();
         });
+};
+
+
+// ############## REST ##############
+
+exports.distance = function (req, res) {
+    req.user.distance(req.body.to);
+};
+
+exports.addContacts = function (req, res) {
+    req.user.mergeContacts(req.body.contacts);
+
+};
+
+exports.addContacts = function (req, res) {
+    req.user.mergeContacts(req.body.contacts);
+
 };

@@ -8,7 +8,7 @@ angular.module('mean.controllers.login', [])
         // Register the login() function
         $scope.login = function(){
             $http.post('/login', {
-                email: $scope.user.email,
+                phoneNumber: $scope.user.phoneNumber,
                 password: $scope.user.password
             })
                 .success(function(user){
@@ -30,6 +30,7 @@ angular.module('mean.controllers.login', [])
             $scope.usernameError = null;
             $scope.registerError = null;
             $http.post('/register', {
+                phoneNumber: $scope.user.phoneNumber,
                 email: $scope.user.email,
                 password: $scope.user.password,
                 confirmPassword: $scope.user.confirmPassword,

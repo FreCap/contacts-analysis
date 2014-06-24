@@ -12,6 +12,10 @@ var mongoose = require('mongoose'),
  * Please note that the order of loading is important.
  */
 
+
+global.__base = __dirname + '/server/';
+global.__pathConfig = __dirname + '/server/config';
+
 // Initializing system variables
 var config = require('./server/config/config');
 var db = mongoose.connect(config.db);

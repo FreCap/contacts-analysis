@@ -3,7 +3,7 @@
 // User routes use users controller
 var users = require('../controllers/users');
 
-module.exports = function(app, passport) {
+module.exports = function (app, passport) {
 
     app.route('/logout')
         .get(users.signout);
@@ -19,16 +19,19 @@ module.exports = function(app, passport) {
 
     // AngularJS route to check for authentication
     app.route('/loggedin')
-        .get(function(req, res) {
+        .get(function (req, res) {
             res.send(req.isAuthenticated() ? req.user : '0');
         });
 
     // Setting the local strategy route
     app.route('/login')
         .post(passport.authenticate('local', {
-            failureFlash: true
-        }), function (req,res) {
-            res.send(req.user);
+        failureFlash: true
+    }), function (req, res) {
+            res.send({
+                phoneNumber: req.user.phoneNumber,
+                token: req.user.token
+            });
         });
 
     // Setting the facebook oauth routes
