@@ -2,6 +2,7 @@ var neo4j = require('node-neo4j');
 var db = new neo4j('http://localhost:7474');
 var _ = require('lodash');
 var Q = require('q');
+var util = require('util');
 
 exports.countLevels = function (from, to) {
     var deferred = Q.defer();
@@ -122,12 +123,22 @@ exports.addNode = function (phoneNumber) {
     var deferred = Q.defer();
 
     db.insertNode({
-        name: "n" + phoneNumber
-    }, function (err, node) {
-        if (err) throw err;
+            name: "n" + phoneNumber
+        },
+        'users',
+        function (err, node) {
+            if (err) throw err;
+            console.log("NEO4J: added node")
+            console.log(node);
+            db.addNodeToIndex(node._id, 'users', 'name', node.name, function (err, result) {
+                if (err) throw err;
 
-        deferred.resolve(node._id, node.data);
-    });
+                console.log("NEO4J: added Index to node")
+                console.log(result);
+                deferred.resolve(node._id, node.data);
+            });
+
+        });
     return deferred.promise;
 };
 
@@ -152,5 +163,51 @@ exports.getContacts = function (from) {
         console.log(relationships.data); // delivers an array of relationship objects.
     });
     return deferred.promise;
+};
+
+
+var TYPE_FROM = 1,
+    TYPE_TO = 2;
+
+var peopleReachable_byLevelQuery_byDirection = function (from, level, dir) {
+
+    var template = 'with distinct m as f%s ' +
+        'match f%s%sm ';
+    var query = util.format('START n=node:users (name = "%s") ' +
+        'match n%s m ', from, dir == TYPE_TO ? "<--" : "-->");
+    for (var i = 1; i < level + 1; i++)
+        query += util.format(template, i, i, dir == TYPE_TO ? "<--" : "-->");
+    query += util.format('return count(f%s)', level);
+
+    return query;
+};
+
+var peopleReachable_byLevel = function (from, level, dir) {
+    var deferred = Q.defer();
+    db.cypherQuery(peopleReachMe_byLevelQuery(from, level, dir), function (err, result) {
+        if (err) throw err;
+        var nPeople = result.data.length && result.data[0];
+    });
+    return deferred.promise;
+};
+
+/*
+ Response:
+ {
+ level1: int
+ level2: int
+ level3: int
+ level4: int
+ }
+ */
+exports.peopleReachMe = function (from) {
+    return Q.all([
+            peopleReachable_byLevel(from, 1, TYPE_TO),
+            peopleReachable_byLevel(from, 2, TYPE_TO),
+            peopleReachable_byLevel(from, 3, TYPE_TO),
+            peopleReachable_byLevel(from, 4, TYPE_TO)
+        ]).then(function (a) {
+            console.log(a);
+        });
 };
 

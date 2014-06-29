@@ -15,7 +15,7 @@ var hasAuthorization = function(req, res, next) {
 module.exports = function(app) {
 
     app.route('/articles')
-        .get(articles.all)
+        .get(authorization.requiresLogin, articles.all)
         .post(authorization.requiresLogin, articles.create);
     app.route('/articles/:articleId')
         .get(articles.show)

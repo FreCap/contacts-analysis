@@ -43,7 +43,21 @@ UserSchema = new Schema({
         surname: String,
         city: String
     },
-    providers: {}
+    providers: {},
+    stats: {
+        peopleReachable: {
+            countStep1: Number,
+            countStep2: Number,
+            countStep3: Number,
+            lastChange: Date
+        },
+        peopleReachMe: {
+            countStep1: Number,
+            countStep2: Number,
+            countStep3: Number,
+            lastChange: Date
+        }
+    }
 });
 
 
@@ -141,7 +155,7 @@ function passwordNeedsRehash(passwordInfo) {
  */
 UserSchema.methods = {
     /**
-     * Authenticate
+     * eenticate
      * verify password and maybe update hash
      *
      * @param {String} plaintext
@@ -219,16 +233,16 @@ UserSchema.methods = {
     },
     addToNeo: function () {
         var user = this;
-        neo4j.addNode(user.phoneNumber)
+        return  neo4j.addNode(user.phoneNumber)
             .then(function () {
                 console.log("aggiunto nodo " + user.phoneNumber + " a neo4j");
 
                 ContactNotExist.find_byPhoneNumber(user.phoneNumber, function (contactNotExist) {
                         if (!contactNotExist)
                             return true;
-                        contactNotExist.inContactsOf.forEach(function (v) {
-                            v.phoneNumber
-                            neo4j.addRel(user.phoneNumber, v.phoneNumber);
+                        contactNotExist.forEach(function (v) {
+                            v.inContactsOf.phoneNumber
+                            neo4j.addRel(user.phoneNumber, v.inContactsOf.phoneNumber);
                         });
                         contactNotExist.remove();
                         // TODO Aggiungere sistema di notifica a tutti quelli che lo avevano in rubrica
@@ -237,25 +251,28 @@ UserSchema.methods = {
                     function () {
                         console.error("ERROR");
                     });
-            });
-        return true;
+                return true;
+            })
     },
     // ################### CONTACTS ###################
-    addContact: function (phoneNumber, success) {
+    /*
+     * contact: {phoneNumber:String,name:String}
+     */
+    addContact: function (contact, success) {
         var user = this;
         return Q({})
             .then(function () {
                 var deferred = Q.defer()
-                UserSchema.find_byPhoneNumber(phoneNumber, deferred.resolve);
+                UserSchema.statics.find_byPhoneNumber(contact.phoneNumber, deferred.resolve);
                 return deferred.promise;
-            }).then(function (contact) {
-                if (contact == null) {
+            }).then(function (contactExist) {
+                if (contactExist == null) {
                     // se non è un utente registrato, creo un "contactNotExist"
                     //TODO aggiungere il name
-                    ContactNotExist.create(phoneNumber, user, "come salvato il rub")
+                    ContactNotExist.create(contact.phoneNumber, user, contact.name)
                 } else {
                     // sennò creo la struttura in neo4j
-                    neo4j.addRel(user.phoneNumber, phoneNumber).
+                    neo4j.addRel(user.phoneNumber, contactExist.phoneNumber).
                         then(success);
                     //TODO notifica push all'utente
                 }
@@ -280,7 +297,7 @@ UserSchema.methods = {
                         // eventualmente da aggiornare
                     } else {
                         // da aggiungere
-                        user.addContact(v.phoneNumber);
+                        user.addContact(v);
                     }
                 });
             });
@@ -292,15 +309,15 @@ UserSchema.methods = {
 
 
 UserSchema.statics.find_byPhoneNumber = function (phoneNumber, callback, callbackError) {
-    this.findOne({
+    User.findOne({
         phoneNumber: phoneNumber
-    }).exec(function (err, contact) {
-            if (err) {
-                callbackError(err);
-            } else {
-                callback(contact);
-            }
-        });
+    }, function (err, contact) {
+        if (err) {
+            callbackError(err);
+        } else {
+            callback(contact);
+        }
+    })
 };
 
 

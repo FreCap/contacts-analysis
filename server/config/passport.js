@@ -53,7 +53,6 @@ module.exports = function (passport) {
                         message: 'Invalid password'
                     });
                 });
-
             });
         }
     ));
@@ -102,53 +101,53 @@ module.exports = function (passport) {
         );
     }
 
-    // Use facebook strategy
-    passport.use(new FacebookStrategy({
-            clientID: config.facebook.clientID,
-            clientSecret: config.facebook.clientSecret,
-            callbackURL: config.facebook.callbackURL,
-            profileFields: ['id', 'username', 'displayName', 'name', 'gender', 'birthday', 'profileUrl', 'emails', 'photos']
-        },
-        socialLoginCB
-    ));
-
-    // Use google strategy
-    passport.use(new GoogleStrategy({
-            clientID: config.google.clientID,
-            clientSecret: config.google.clientSecret,
-            callbackURL: config.google.callbackURL
-        },
-        socialLoginCB
-    ));
-
-    // use linkedin strategy
-    passport.use(new LinkedinStrategy({
-            consumerKey: config.linkedin.clientID,
-            consumerSecret: config.linkedin.clientSecret,
-            callbackURL: config.linkedin.callbackURL,
-            profileFields: ['id', 'first-name', 'last-name', 'email-address']
-        },
-        function (accessToken, refreshToken, profile, done) {
-            User.findOne({
-                'linkedin.id': profile.id
-            }, function (err, user) {
-                if (!user) {
-                    user = new User({
-                        name: profile.displayName,
-                        email: profile.emails[0].value,
-                        username: profile.emails[0].value,
-                        provider: 'linkedin'
-                    });
-                    user.save(function (err) {
-                        if (err) console.log(err);
-                        return done(err, user);
-                    });
-                } else {
-                    return done(err, user);
-                }
-            });
-        }
-    ));
+//    // Use facebook strategy
+//    passport.use(new FacebookStrategy({
+//            clientID: config.facebook.clientID,
+//            clientSecret: config.facebook.clientSecret,
+//            callbackURL: config.facebook.callbackURL,
+//            profileFields: ['id', 'username', 'displayName', 'name', 'gender', 'birthday', 'profileUrl', 'emails', 'photos']
+//        },
+//        socialLoginCB
+//    ));
+//
+//    // Use google strategy
+//    passport.use(new GoogleStrategy({
+//            clientID: config.google.clientID,
+//            clientSecret: config.google.clientSecret,
+//            callbackURL: config.google.callbackURL
+//        },
+//        socialLoginCB
+//    ));
+//
+//    // use linkedin strategy
+//    passport.use(new LinkedinStrategy({
+//            consumerKey: config.linkedin.clientID,
+//            consumerSecret: config.linkedin.clientSecret,
+//            callbackURL: config.linkedin.callbackURL,
+//            profileFields: ['id', 'first-name', 'last-name', 'email-address']
+//        },
+//        function (accessToken, refreshToken, profile, done) {
+//            User.findOne({
+//                'linkedin.id': profile.id
+//            }, function (err, user) {
+//                if (!user) {
+//                    user = new User({
+//                        name: profile.displayName,
+//                        email: profile.emails[0].value,
+//                        username: profile.emails[0].value,
+//                        provider: 'linkedin'
+//                    });
+//                    user.save(function (err) {
+//                        if (err) console.log(err);
+//                        return done(err, user);
+//                    });
+//                } else {
+//                    return done(err, user);
+//                }
+//            });
+//        }
+//    ));
 
 
 };
