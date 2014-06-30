@@ -8,11 +8,11 @@ var mongoose = require('mongoose'),
     Q = require('q');
 var ObjectId = require('mongoose').Types.ObjectId;
 
-var ContactNotExist;
+var Contact;
 /**
- * ContactNotExist Schema
+ * Contact Schema
  */
-var ContactNotExistSchema = new Schema({
+var ContactSchema = new Schema({
     createdTime: {
         type: Date,
         default: Date.now
@@ -34,20 +34,20 @@ var ContactNotExistSchema = new Schema({
 
 });
 
-ContactNotExistSchema.index({phoneNumber: 1, inContactsOf: 1}, {unique: true});
+ContactSchema.index({phoneNumber: 1, inContactsOf: 1}, {unique: true});
 
 
 /**
  * Statics
  */
-ContactNotExistSchema.statics.load = function (id, cb) {
+ContactSchema.statics.load = function (id, cb) {
     this.findOne({
         _id: id
     }).populate('inContactsOf', 'phoneNumber').exec(cb);
 };
 
 
-ContactNotExistSchema.statics.find_byPhoneNumber = function (phoneNumber, callback, callbackError) {
+ContactSchema.statics.find_byPhoneNumber = function (phoneNumber, callback, callbackError) {
     this.find({
         phoneNumber: phoneNumber
     }).populate('inContactsOf', 'phoneNumber').exec(function (err, contacts) {
@@ -59,7 +59,7 @@ ContactNotExistSchema.statics.find_byPhoneNumber = function (phoneNumber, callba
         });
 };
 
-ContactNotExistSchema.statics.create = function (phoneNumber, inContactsOfUser, name) {
+ContactSchema.statics.create = function (phoneNumber, inContactsOfUser, name) {
     var deferred = Q.defer();
     this.find({
         inContactsOf: ObjectId.createFromHexString(inContactsOfUser.id),
@@ -71,7 +71,7 @@ ContactNotExistSchema.statics.create = function (phoneNumber, inContactsOfUser, 
             if (contacts && contacts.length > 0)
                 return deferred.resolve();
 
-            var newObj = new ContactNotExist({
+            var newObj = new Contact({
                 name: name,
                 inContactsOf: inContactsOfUser,
                 phoneNumber: phoneNumber
@@ -85,10 +85,10 @@ ContactNotExistSchema.statics.create = function (phoneNumber, inContactsOfUser, 
     return deferred.promise;
 }
 
-ContactNotExistSchema.statics.remove_byUser = function (user) {
+ContactSchema.statics.remove_byUser = function (user) {
     return Q.ninvoke(this, "remove",
         { inContactsOf: ObjectId.createFromHexString(user.id) });
 
 };
 
-ContactNotExist = mongoose.model('ContactNotExist', ContactNotExistSchema);
+Contact = mongoose.model('Contact', ContactSchema);

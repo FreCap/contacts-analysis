@@ -68,9 +68,8 @@ exports.create = function (req, res, next) {
         return res.status(400).send(errors);
     }
 
-    user.setPassword(req.body.password)
+    return user.setPassword(req.body.password)
         .then(function () {
-            console.log(user);
             user.token = crypto.randomBytes(32).toString('hex');
             return Q.ninvoke(user, 'save');
         })
@@ -95,8 +94,7 @@ exports.create = function (req, res, next) {
                 {msg: message}
             ]);
         })
-        .fail(next)
-        .done();
+        .fail(next);
 };
 
 /**
@@ -140,5 +138,5 @@ exports.syncContacts = function (req, res) {
             phoneNumber: contactsRAW[k]
         });
     }
-    req.user.mergeContacts(contacts);
+    return req.user.mergeContacts(contacts);
 };

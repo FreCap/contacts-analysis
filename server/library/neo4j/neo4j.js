@@ -128,13 +128,13 @@ exports.addNode = function (phoneNumber) {
         'users',
         function (err, node) {
             if (err) throw err;
-            console.log("NEO4J: added node")
-            console.log(node);
+//            console.log("NEO4J: added node")
+//            console.log(node);
             db.addNodeToIndex(node._id, 'users', 'name', node.name, function (err, result) {
                 if (err) throw err;
 
-                console.log("NEO4J: added Index to node")
-                console.log(result);
+//                console.log("NEO4J: added Index to node")
+//                console.log(result);
                 deferred.resolve(node._id, node.data);
             });
 
@@ -143,10 +143,23 @@ exports.addNode = function (phoneNumber) {
 };
 
 
+exports.removeNode = function (nodeId) {
+//    return Q.ninvoke(db, 'cypherQuery', 'START n=node(' + nodeId + ') OPTIONAL MATCH (n)-[r]-() DELETE n,r');
+    var deferred = Q.defer();
+
+    db.cypherQuery('START n=node(' + nodeId + ') OPTIONAL MATCH (n)-[r]-() DELETE n,r',
+        function (err, relationship) {
+            if (err) throw err;
+            deferred.resolve(relationship.data);
+        });
+    return deferred.promise;
+};
+
+
 exports.addRel = function (from, to) {
     var deferred = Q.defer();
 
-    db.insertRelationship(from, to, 'HAS', function (err, relationship) {
+    db.insertRelationship(from, to, 'HAS', {}, function (err, relationship) {
         if (err) throw err;
         deferred.resolve(relationship.data);
     });
@@ -160,7 +173,7 @@ exports.getContacts = function (from) {
         'return x.name', function (err, relationships) {
         if (err) throw err;
         deferred.resolve(relationships.data);
-        console.log(relationships.data); // delivers an array of relationship objects.
+        // delivers an array of relationship objects.
     });
     return deferred.promise;
 };

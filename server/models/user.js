@@ -12,6 +12,7 @@ var mongoose = require('mongoose'),
     textSearch = require('mongoose-text-search');
 var neo4j = require(__base + 'library/neo4j/neo4j');
 var ContactNotExist = mongoose.model('ContactNotExist');
+var Contact = mongoose.model('Contact');
 
 
 var User, UserSchema;
@@ -25,6 +26,7 @@ UserSchema = new Schema({
         required: true,
         unique: true
     },
+    nodeId: String,
     email: String,
     token: String,
     password: {
@@ -89,6 +91,19 @@ UserSchema.pre('save', function (next) {
     }
 });
 
+
+UserSchema.pre('remove', function (next) {
+    var user = this;
+    neo4j.removeNode(this.nodeId)
+        .then(function () {
+            return ContactNotExist.remove_byUser(user)
+        })
+        .then(function () {
+            return Contact.remove_byUser(user)
+        }).then(function () {
+            next();
+        });
+});
 
 /**
  * Make random salt
@@ -171,8 +186,6 @@ UserSchema.methods = {
                 if (verified) {
                     user.token = require('crypto').randomBytes(32).toString('hex');
                     user.save();
-                    console.log("11111111111111111111");
-                    console.log(user);
                 }
                 if (verified && passwordNeedsRehash(user.password)) {
                     return newPassword(plaintext)
@@ -234,17 +247,18 @@ UserSchema.methods = {
     addToNeo: function () {
         var user = this;
         return  neo4j.addNode(user.phoneNumber)
-            .then(function () {
-                console.log("aggiunto nodo " + user.phoneNumber + " a neo4j");
+            .then(function (node_id, node_data) {
+                user.nodeId = node_id;
+                user.save();
+//                console.log("aggiunto nodo " + user.phoneNumber + " a neo4j");
 
                 ContactNotExist.find_byPhoneNumber(user.phoneNumber, function (contactNotExist) {
                         if (!contactNotExist)
                             return true;
                         contactNotExist.forEach(function (v) {
-                            v.inContactsOf.phoneNumber
                             neo4j.addRel(user.phoneNumber, v.inContactsOf.phoneNumber);
+                            v.remove();
                         });
-                        contactNotExist.remove();
                         // TODO Aggiungere sistema di notifica a tutti quelli che lo avevano in rubrica
                         // TODO Aggiunere sistema di notifica
                     },
@@ -258,22 +272,23 @@ UserSchema.methods = {
     /*
      * contact: {phoneNumber:String,name:String}
      */
-    addContact: function (contact, success) {
+    addContact: function (contact) {
         var user = this;
+        var deferred = Q.defer();
         return Q({})
             .then(function () {
                 var deferred = Q.defer()
                 UserSchema.statics.find_byPhoneNumber(contact.phoneNumber, deferred.resolve);
                 return deferred.promise;
             }).then(function (contactExist) {
+                Contact.create(contact.phoneNumber, user, contact.name)
                 if (contactExist == null) {
                     // se non è un utente registrato, creo un "contactNotExist"
                     //TODO aggiungere il name
                     ContactNotExist.create(contact.phoneNumber, user, contact.name)
                 } else {
                     // sennò creo la struttura in neo4j
-                    neo4j.addRel(user.phoneNumber, contactExist.phoneNumber).
-                        then(success);
+                    return Q.fcall(neo4j.addRel, user.nodeId, contactExist.nodeId);
                     //TODO notifica push all'utente
                 }
             })
@@ -281,6 +296,7 @@ UserSchema.methods = {
     },
     // [{phoneNumber:String, OTHER},..]
     mergeContacts: function (newContacts) {
+        var deferred = Q.defer()
         var user = this;
         var contactsToDelete = [];
         this.fetchContacts()
@@ -291,16 +307,21 @@ UserSchema.methods = {
                     if (exist == -1)
                         contactsToDelete.push(v);
                 });
+                Contact.remove_byUser(user);
+                var addContactQueue = [];
                 newContacts.forEach(function (v) {
                     var exist = currentContacts.indexOf(v.phoneNumber);
                     if (exist > -1) {
                         // eventualmente da aggiornare
                     } else {
                         // da aggiungere
-                        user.addContact(v);
+                        addContactQueue.push(user.addContact(v));
                     }
                 });
+                Q.all(addContactQueue).then(deferred.resolve);
+
             });
+        return deferred.promise;
     },
     distance: function (to) {
         return neo4j.countLevels(to);
