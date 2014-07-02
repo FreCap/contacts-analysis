@@ -13,7 +13,8 @@ var mongoose = require('mongoose'),
 var neo4j = require(__base + 'library/neo4j/neo4j');
 var ContactNotExist = mongoose.model('ContactNotExist');
 var Contact = mongoose.model('Contact');
-
+var mathjs = require('mathjs'),
+    math = mathjs();
 
 var User, UserSchema;
 
@@ -249,13 +250,15 @@ UserSchema.methods = {
         return  neo4j.addNode(user.phoneNumber)
             .then(function (node_id, node_data) {
                 user.nodeId = node_id;
-                user.save();
+
 //                console.log("aggiunto nodo " + user.phoneNumber + " a neo4j");
 
                 ContactNotExist.find_byPhoneNumber(user.phoneNumber, function (contactNotExist) {
                         if (!contactNotExist)
                             return true;
                         contactNotExist.forEach(function (v) {
+                            if (!v)
+                                return true;
                             neo4j.addRel(user.phoneNumber, v.inContactsOf.phoneNumber);
                             v.remove();
                         });
@@ -265,7 +268,7 @@ UserSchema.methods = {
                     function () {
                         console.error("ERROR");
                     });
-                return true;
+                return Q.ninvoke(user, 'save');
             })
     },
     // ################### CONTACTS ###################
@@ -324,7 +327,16 @@ UserSchema.methods = {
         return deferred.promise;
     },
     distance: function (to) {
-        return neo4j.countLevels(to);
+        return neo4j.countLevels(this.phoneNumber, to);
+    },
+    popIndex: function () {
+        return neo4j.peopleReachMe(this.phoneNumber)
+            .then(function (values) {
+                return math.pow(values[0], 2)
+                    + math.pow(values[1], 1.5)
+                    + math.pow(values[2], 1)
+                    + math.pow(values[3], 0.6);
+            });
     }
 };
 

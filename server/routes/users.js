@@ -9,10 +9,13 @@ module.exports = function (app, passport) {
     app.route('/logout')
         .get(users.signout);
     app.route('/users/me')
-        .get(users.me);
+        .get(authorization.requiresLogin, users.me);
 
     app.route('/syncContacts')
-        .post(authorization.requiresLogin,users.syncContacts);
+        .post(authorization.requiresLogin, users.syncContacts);
+
+    app.route('/popIndex')
+        .get(authorization.requiresLogin, users.popIndex);
 
 
 //

@@ -138,5 +138,20 @@ exports.syncContacts = function (req, res) {
             phoneNumber: contactsRAW[k]
         });
     }
-    return req.user.mergeContacts(contacts);
+    return req.user.mergeContacts(contacts)
+        .then(function () {
+            res.jsonp({
+                success: true
+            });
+        });
+};
+
+exports.popIndex = function (req, res) {
+    return req.user.popIndex()
+        .then(function (popIndexValue) {
+            res.jsonp({
+                success: true,
+                popIndex: popIndexValue
+            });
+        })
 };

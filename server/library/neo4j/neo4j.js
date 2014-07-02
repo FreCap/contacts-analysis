@@ -179,17 +179,19 @@ exports.getContacts = function (from) {
 };
 
 
-var TYPE_FROM = 1,
-    TYPE_TO = 2;
+var TYPE_FROM = '-->',
+    TYPE_TO = '<--',
+    TYPE_BOTH = '<-->';
 
 var peopleReachable_byLevelQuery_byDirection = function (from, level, dir) {
+    var template = ' match f%s%sm ' +
+        'with distinct m as f%s ';
 
-    var template = 'with distinct m as f%s ' +
-        'match f%s%sm ';
-    var query = util.format('START n=node:users (name = "%s") ' +
-        'match n%s m ', from, dir == TYPE_TO ? "<--" : "-->");
-    for (var i = 1; i < level + 1; i++)
-        query += util.format(template, i, i, dir == TYPE_TO ? "<--" : "-->");
+    var query = util.format('START n=node:users (name = "n%s") ' +
+        'match n%s m ' +
+        ' with distinct m as f1 ', from, dir);
+    for (var i = 1; i < level; i++)
+        query += util.format(template, i,dir, i+1);
     query += util.format('return count(f%s)', level);
 
     return query;
@@ -197,9 +199,10 @@ var peopleReachable_byLevelQuery_byDirection = function (from, level, dir) {
 
 var peopleReachable_byLevel = function (from, level, dir) {
     var deferred = Q.defer();
-    db.cypherQuery(peopleReachMe_byLevelQuery(from, level, dir), function (err, result) {
+    db.cypherQuery(peopleReachable_byLevelQuery_byDirection(from, level, dir), function (err, result) {
         if (err) throw err;
         var nPeople = result.data.length && result.data[0];
+        deferred.resolve(nPeople);
     });
     return deferred.promise;
 };
@@ -220,7 +223,7 @@ exports.peopleReachMe = function (from) {
             peopleReachable_byLevel(from, 3, TYPE_TO),
             peopleReachable_byLevel(from, 4, TYPE_TO)
         ]).then(function (a) {
-            console.log(a);
+            return a;
         });
 };
 

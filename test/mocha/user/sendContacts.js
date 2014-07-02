@@ -8,71 +8,34 @@ var should = require('should'),
     User = mongoose.model('User'),
     userController = require(global.__base + 'controllers/users'),
     Q = require('q'),
-    util = require('util');
+    util = require('util'),
+    functions = require('./functions');
 
 //Globals
 var user, user2;
 
+
 //The tests
 describe('<Unit Test>', function () {
-    describe('Model User:', function () {
+    describe('SendContacts:', function () {
         before(function (done) {
             this.timeout(50000);
-            var user1 = {
-                name: 'Primo1',
-                email: 'test@test.com',
-                phoneNumber: '+393484650470',
-                password: 'p',
-                confirmPassword: 'p'
-            };
-
-            var user2 = {
-                name: 'Secondo2',
-                email: 'test@test.com',
-                phoneNumber: '+393401405382',
-                password: 'p',
-                confirmPassword: 'p'
-            };
-
-            var stubReq1 = {
-                validationErrors: function () {
-                    return false;
-                },
-                logIn: function (user, done) {
-                    done();
-                },
-                body: user1
-            };
-            var stubRes = {
-                redirect: function () {
-                    return true;
-                }
-            }
-            userController.create(stubReq1, stubRes, "")
-                .then(function () {
-                    stubReq1.body = user2;
-                    return Q.fcall(userController.create, stubReq1, stubRes, "");
-                }).then(function () {
-                    done();
-                });
+            functions.initUser(2).then(function () {
+                done();
+            });
         });
 
         describe('Method SyncContacts', function () {
             it('should have before test user Primo1', function (done) {
-                User.find({ phoneNumber: '+393484650470' }, function (err, users) {
-                    users.should.have.length(1);
-                    user = users[0];
-                    done();
-                });
+                user = functions.getUser(0);
+                should.exist(user)
+                done();
             });
 
             it('should have before test user Secondo2', function (done) {
-                User.find({ phoneNumber: '+393401405382' }, function (err, users) {
-                    users.should.have.length(1);
-
-                    user2 = users[0];
-                    done();
-                });
+                user2 = functions.getUser(1);
+                should.exist(user2);
+                done();
             });
 
             it('should create contacts', function (done) {
@@ -103,25 +66,14 @@ describe('<Unit Test>', function () {
             });
         });
 
-
         after(function (done) {
             this.timeout(50000);
 
-            user.remove(function () {
-                user2.remove(function () {
-                    done();
-                });
+            functions.removeUsers()
+                .then(function () {
+                done();
             });
-//            user2.remove();
-//            user && user2 && Q.all([
-//                ])
-//                .spread(function (a, b) {
-//                    console.log(a, b);
-////                    done();
-//                }
-//            )
-//            ;
+
         });
     });
-})
-;
+});

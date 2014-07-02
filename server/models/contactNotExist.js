@@ -77,7 +77,6 @@ ContactNotExistSchema.statics.create = function (phoneNumber, inContactsOfUser, 
                 phoneNumber: phoneNumber
             });
             newObj.save(function (err, doc) {
-                console.log(err);
                 return deferred.resolve();
             });
         });
