@@ -124,7 +124,9 @@ exports.user = function (req, res, next, id) {
 // ############## REST ##############
 
 exports.distance = function (req, res) {
-    req.user.distance(req.body.to);
+    User.find_byPhoneNumber(req.body.to, function (userTo) {
+        req.user.distance(userTo);
+    });
 };
 
 exports.syncContacts = function (req, res) {

@@ -13,6 +13,7 @@ var mongoose = require('mongoose'),
 var neo4j = require(__base + 'library/neo4j/neo4j');
 var ContactNotExist = mongoose.model('ContactNotExist');
 var Contact = mongoose.model('Contact');
+var Stats = mongoose.model('Stats');
 var mathjs = require('mathjs'),
     math = mathjs();
 
@@ -27,7 +28,7 @@ UserSchema = new Schema({
         required: true,
         unique: true
     },
-    nodeId: String,
+    nodeId: Number,
     email: String,
     token: String,
     password: {
@@ -48,18 +49,26 @@ UserSchema = new Schema({
     },
     providers: {},
     stats: {
+        computed: {
+            wanted: Number,
+            power: Number,
+            popularity: Number,
+            fancy: Number,
+            total: Number,
+            lastUpdate: Date
+        },
+        searched: Number,
         peopleReachable: {
             countStep1: Number,
             countStep2: Number,
-            countStep3: Number,
-            lastChange: Date
+            lastUpdate: Date
         },
         peopleReachMe: {
             countStep1: Number,
             countStep2: Number,
-            countStep3: Number,
-            lastChange: Date
+            lastUpdate: Date
         }
+
     }
 });
 
@@ -165,6 +174,22 @@ function passwordNeedsRehash(passwordInfo) {
         passwordInfo.salt.length !== User.PW_SALT_LENGTH;
 }
 
+var popIndexAggregate = function (nodesId, sommatoriaOf) {
+    var deferred = Q.defer();
+    User.aggregate([
+        {"$match": {nodeId: {$in: nodesId}}},
+        {
+            "$group": {
+                "_id": null,
+                "total": {
+                    "$sum": sommatoriaOf
+                }
+            }
+        }
+    ], deferred.makeNodeResolver());
+
+    return deferred.promise;
+}
 
 /**
  * Instance methods
@@ -243,7 +268,7 @@ UserSchema.methods = {
     fetchContacts: function () {
         var user = this;
 
-        return neo4j.getContacts(user.phoneNumber);
+        return neo4j.getContacts(user.nodeId);
     },
     addToNeo: function () {
         var user = this;
@@ -259,7 +284,7 @@ UserSchema.methods = {
                         contactNotExist.forEach(function (v) {
                             if (!v)
                                 return true;
-                            neo4j.addRel(user.phoneNumber, v.inContactsOf.phoneNumber);
+                            neo4j.addRel(user.nodeId, v.inContactsOf.nodeId);
                             v.remove();
                         });
                         // TODO Aggiungere sistema di notifica a tutti quelli che lo avevano in rubrica
@@ -315,28 +340,160 @@ UserSchema.methods = {
                 newContacts.forEach(function (v) {
                     var exist = currentContacts.indexOf(v.phoneNumber);
                     if (exist > -1) {
+                        Contact.create(v.phoneNumber, user, v.name)
                         // eventualmente da aggiornare
+
                     } else {
                         // da aggiungere
                         addContactQueue.push(user.addContact(v));
                     }
                 });
-                Q.all(addContactQueue).then(deferred.resolve);
+                Q.all(addContactQueue)
+                    .then(function () {
+                        return user.updateInContactsStats();
+                    })
+                    .then(deferred.resolve);
 
             });
         return deferred.promise;
     },
+    updateInContactsStats: function () {
+        var user = this;
+        return Q.all([neo4j.peopleReachable(user.nodeId)
+                .spread(function (level1, level2) {
+                    user.stats.peopleReachable.countStep1 = level1.length;
+                    user.stats.peopleReachable.countStep2 = level2.length;
+                })
+                , neo4j.peopleReachMe(user.nodeId)
+                    .spread(function (level1, level2) {
+                        user.stats.peopleReachMe.countStep1 = level1.length;
+                        user.stats.peopleReachMe.countStep2 = level2.length;
+
+                    })
+            ]).then(function () {
+                return Q.ninvoke(user, "save");
+            });
+    },
     distance: function (to) {
-        return neo4j.countLevels(this.phoneNumber, to);
+        return neo4j.countLevels(this.nodeId, to.nodeId);
     },
     popIndex: function () {
-        return neo4j.peopleReachMe(this.phoneNumber)
+        return neo4j.countPeopleReachMe(this.nodeId)
             .then(function (values) {
                 return math.pow(values[0], 2)
                     + math.pow(values[1], 1.5)
                     + math.pow(values[2], 1)
                     + math.pow(values[3], 0.6);
             });
+    },
+    statsGet: function () {
+        var user = this,
+            computed = user.stats.computed;
+        return {
+            wanted: computed.wanted ? computed.wanted : 0,
+            power: computed.power ? computed.power : 0,
+            popularity: computed.popularity ? computed.popularity : 0,
+            fancy: computed.wanted ? computed.fancy : 0
+        }
+    },
+    statsCalculator: function () {
+        var user = this;
+        return {
+            wanted: function () {
+                //quando mi cercano
+
+                return Q(user.stats.searched);
+            },
+            power: function () {
+                //POWER(N):= Sommatoria (NU1_i * R(NU1_i)) + RadiceQuadtrata (Sommatoria (NU2_i * R(NU2_i)))
+                return neo4j.peopleReachable(user.nodeId)
+                    .spread(function (level1, level2) {
+                        user.stats.peopleReachable.countStep1 = level1.length;
+                        user.stats.peopleReachable.countStep2 = level2.length;
+                        console.log("all done")
+                        return Q.all([
+                                popIndexAggregate(level1.toArray(),
+                                    {"$multiply": ["$stats.peopleReachable.countStep1"
+                                        , {"$add": [1,
+                                            {"$ifNull": [ "$stats.searched", 0]}
+                                        ]}
+                                    ]}),
+                                popIndexAggregate(level2.toArray(),
+                                    {"$multiply": ["$stats.peopleReachable.countStep2"
+                                        , {"$add": [1,
+                                            {"$ifNull": [ "$stats.searched", 0]}
+                                        ]}
+                                    ]})
+                            ]).spread(function (level1Options, level2Options) {
+                                var level1Index = level1Options.length ? level1Options[0].total : 0,
+                                    level2Index = level2Options.length ? level2Options[0].total : 0;
+
+                                user.stats.computed.power = level1Index + math.sqrt(level2Index);
+                                return Q.ninvoke(user, "save")
+                                    .then(function () {
+                                        return user.stats.computed.power;
+                                    });
+                            });
+                    });
+            },
+            popularity: function () {
+                //POPULARITY(N):= Sommatoria (NE1_i) + RadiceQuadtrata (Sommatoria (NE2_i ))
+                return neo4j.peopleReachMe(user.nodeId)
+                    .spread(function (level1, level2) {
+                        user.stats.peopleReachMe.countStep1 = level1.length;
+                        user.stats.peopleReachMe.countStep2 = level2.length;
+                        return Q.all([
+                                popIndexAggregate(level1.toArray(),
+                                    "$stats.peopleReachMe.countStep1"),
+                                popIndexAggregate(level2.toArray(),
+                                    "$stats.peopleReachMe.countStep2")
+
+                            ]).spread(function (level1Options, level2Options) {
+                                var level1Index = level1Options.length ? level1Options[0].total : 0,
+                                    level2Index = level2Options.length ? level2Options[0].total : 0;
+                                user.stats.computed.popularity = level1Index + math.sqrt(level2Index);
+                                return Q.ninvoke(user, "save")
+                                    .then(function () {
+                                        return user.stats.computed.popularity;
+                                    });
+                            });
+                    });
+            },
+            fancy: function () {
+                //FANCY(N):= WANTED(N) / POPULARITY(N)
+                user.stats.computed.fancy = math.pow(user.statsGet().wanted, 3) / user.statsGet().popularity;
+                return Q.ninvoke(user, "save")
+                    .then(function () {
+                        return user.stats.computed.fancy;
+                    });
+            },
+            total: function () {
+                //RI(N) = WANTED(N) + POWER(N) +POPULARITY(N)+FANCY(N)
+                return Q.all([
+                        user.statsCalculator().wanted(),
+                        user.statsCalculator().power(),
+                        user.statsCalculator().popularity(),
+                        user.statsCalculator().fancy()
+                    ]).then(function () {
+                        user.stats.computed.total = user.statsGet().wanted
+                            + user.statsGet().power
+                            + user.statsGet().popularity
+                            + user.statsGet().fancy;
+                        user.stats.computed.lastUpdate = Date.now();
+                        var stats = new Stats({
+                            stats: user.statsGet(),
+                            user: user
+                        })
+                        return Q.ninvoke(user, "save").
+                            then(function () {
+                                return Q.ninvoke(stats, "save");
+                            })
+                            .then(function () {
+                                return user.stats.computed.total;
+                            });
+                    });
+            }
+        }
     }
 };
 

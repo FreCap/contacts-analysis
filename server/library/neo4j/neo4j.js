@@ -3,10 +3,11 @@ var db = new neo4j('http://localhost:7474');
 var _ = require('lodash');
 var Q = require('q');
 var util = require('util');
+var Set = require("collections/set");
 
 exports.countLevels = function (from, to) {
     var deferred = Q.defer();
-    db.cypherQuery('START n1=node:users (name = "' + from + '"), n2=node:users (name = "' + to + '")' +
+    db.cypherQuery('START n1=node(' + from + '), n2=node(' + to + ')' +
         'match sp=shortestPath((n1)-[*]->(n2))' +
         'RETURN length(sp) ', function (err, result) {
         if (err) throw err;
@@ -19,7 +20,7 @@ exports.countLevels = function (from, to) {
 
 exports.inContactsOf = function (from) {
     var deferred = Q.defer();
-    db.cypherQuery('START n1=node:users (name = "' + from + '")' +
+    db.cypherQuery('START n1=node(' + from + ')' +
         'MATCH ((n1)-->(n2))' +
         'RETURN n2', function (err, result) {
         if (err) throw err;
@@ -94,7 +95,7 @@ exports.contactsThatCanReach = function (from, to) {
     exports.countLevels(from, to)
         .then(function (nLevelOriginal) {
             var deferred = Q.defer();
-            db.cypherQuery('START s=node:users (name = "' + from + '"), p=node:users (name = "' + to + '") ' +
+            db.cypherQuery('START s=node(' + from + '), p=node(' + to + ') ' +
                 'match s-[:HAS]->x,p ' +
                 'with x,p ' +
                 '    match paths=shortestPath(x-[*..' + (nLevelOriginal + 2) + ']->p) ' +
@@ -168,7 +169,7 @@ exports.addRel = function (from, to) {
 
 exports.getContacts = function (from) {
     var deferred = Q.defer();
-    db.cypherQuery('START s=node:users (name = "' + from + '") ' +
+    db.cypherQuery('START s=node(' + from + ') ' +
         'match s-[:HAS]->x ' +
         'return x.name', function (err, relationships) {
         if (err) throw err;
@@ -183,26 +184,36 @@ var TYPE_FROM = '-->',
     TYPE_TO = '<--',
     TYPE_BOTH = '<-->';
 
-var peopleReachable_byLevelQuery_byDirection = function (from, level, dir) {
+var peopleReachable_byLevelQuery_byDirection = function (from, level, dir, count) {
+    count == undefined ? count = true : count = count;
     var template = ' match f%s%sm ' +
         'with distinct m as f%s ';
 
-    var query = util.format('START n=node:users (name = "n%s") ' +
+    var query = util.format('START n=node(%s) ' +
         'match n%s m ' +
         ' with distinct m as f1 ', from, dir);
     for (var i = 1; i < level; i++)
-        query += util.format(template, i,dir, i+1);
-    query += util.format('return count(f%s)', level);
+        query += util.format(template, i, dir, i + 1);
+    if (count)
+        query += util.format('return count(f%s)', level);
+    else
+        query += util.format('return f%s', level);
 
+    console.log(query);
     return query;
 };
 
-var peopleReachable_byLevel = function (from, level, dir) {
+var peopleReachable_byLevel = function (from, level, dir, count) {
+    count == undefined ? count = true : count = count;
     var deferred = Q.defer();
-    db.cypherQuery(peopleReachable_byLevelQuery_byDirection(from, level, dir), function (err, result) {
+    db.cypherQuery(peopleReachable_byLevelQuery_byDirection(from, level, dir, count), function (err, result) {
         if (err) throw err;
-        var nPeople = result.data.length && result.data[0];
-        deferred.resolve(nPeople);
+        if (count) {
+            var nPeople = result.data.length && result.data[0];
+            deferred.resolve(nPeople);
+        } else {
+            result.data && deferred.resolve(result.data);
+        }
     });
     return deferred.promise;
 };
@@ -216,14 +227,50 @@ var peopleReachable_byLevel = function (from, level, dir) {
  level4: int
  }
  */
-exports.peopleReachMe = function (from) {
+exports.countPeopleReachMe = function (from) {
     return Q.all([
-            peopleReachable_byLevel(from, 1, TYPE_TO),
-            peopleReachable_byLevel(from, 2, TYPE_TO),
-            peopleReachable_byLevel(from, 3, TYPE_TO),
-            peopleReachable_byLevel(from, 4, TYPE_TO)
-        ]).then(function (a) {
-            return a;
+        peopleReachable_byLevel(from, 1, TYPE_TO),
+        peopleReachable_byLevel(from, 2, TYPE_TO),
+        peopleReachable_byLevel(from, 3, TYPE_TO)
+    ])
+};
+
+exports.countPeopleReachable = function (from) {
+    return Q.all([
+        peopleReachable_byLevel(from, 1, TYPE_FROM),
+        peopleReachable_byLevel(from, 2, TYPE_FROM),
+        peopleReachable_byLevel(from, 3, TYPE_FROM)
+    ])
+};
+
+
+var peopleReachIntersectionsMe = function (from, direction) {
+    return Q.all([
+            peopleReachable_byLevel(from, 1, direction, false),
+            peopleReachable_byLevel(from, 2, direction, false)
+        ]).spread(function (leve11, level2) {
+            var level1Set = new Set();
+            var level2Set = new Set();
+
+            level2.forEach(function (node) {
+                level2Set.add(node._id);
+            })
+            leve11.forEach(function (node) {
+                level2Set.remove(node._id);
+                level1Set.add(node._id);
+            })
+            level2Set.remove(from);
+            level1Set.remove(from);
+            return [level1Set,level2Set];
         });
+};
+
+
+exports.peopleReachMe = function (from) {
+    return peopleReachIntersectionsMe(from, TYPE_TO);
+};
+
+exports.peopleReachable = function (from) {
+    return peopleReachIntersectionsMe(from, TYPE_FROM);
 };
 
