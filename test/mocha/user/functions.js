@@ -10,32 +10,36 @@ var should = require('should'),
 
 var usersModel = [
     {
-        name: 'Primo1',
+        personal: {name: 'Primo1', surname: "fre"},
         email: 'test@test.com',
         phoneNumber: '+393484650470',
         password: 'p',
-        confirmPassword: 'p'
+        confirmPassword: 'p',
+        tags:["exampletag1","all"]
     },
     {
-        name: 'Secondo2',
+        personal: {name: 'Secondo2', surname: "laura"},
         email: 'test@test.com',
         phoneNumber: '+393401405382',
         password: 'p',
-        confirmPassword: 'p'
+        confirmPassword: 'p',
+        tags:["exampletag","all"]
     },
     {
-        name: 'Terzo3',
+        personal: {name: 'Terzo3', surname: "mirco"},
         email: 'test@test.com',
         phoneNumber: '+393319149997',
         password: 'p',
-        confirmPassword: 'p'
+        confirmPassword: 'p',
+        tags:["exampletag","all"]
     },
     {
-        name: 'Quarto4',
+        personal: {name: 'Quarto4', surname: "vecchio"},
         email: 'test@test.com',
         phoneNumber: '+393396507813',
         password: 'p',
-        confirmPassword: 'p'
+        confirmPassword: 'p',
+        tags:["all"]
     }
 ];
 

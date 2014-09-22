@@ -15,10 +15,14 @@ module.exports = function (app, passport) {
         .post(authorization.requiresLogin, users.syncContacts);
 
     app.route('/popIndex')
-        .get(authorization.requiresLogin, users.popIndex);
+        .post(authorization.requiresLogin, users.popIndex);
 
+    app.route('/popIndexHistory')
+        .post(authorization.requiresLogin, users.popIndexHistory);
 
-//
+    app.route('/find')
+        .post(authorization.requiresLogin, users.find);
+
 //    app.route('me/popIndex')
 //        .get(authorization.requiresLogin, users.popIndex)
 

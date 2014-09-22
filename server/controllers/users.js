@@ -7,6 +7,7 @@ var mongoose = require('mongoose'),
     User = mongoose.model('User'),
     Q = require('q'),
     crypto = require('crypto');
+var Stats = mongoose.model('Stats');
 
 /**
  * Auth callback
@@ -120,7 +121,6 @@ exports.user = function (req, res, next, id) {
         });
 };
 
-
 // ############## REST ##############
 
 exports.distance = function (req, res) {
@@ -149,11 +149,80 @@ exports.syncContacts = function (req, res) {
 };
 
 exports.popIndex = function (req, res) {
-    return req.user.popIndex()
+    var user = req.user;
+    return     user.statsCalculator().total()
         .then(function (popIndexValue) {
-            res.jsonp({
+            var stats = user.statsGet();
+            return res.jsonp({
                 success: true,
-                popIndex: popIndexValue
+                popIndex: popIndexValue,
+                wanted: stats.wanted / popIndexValue * 100,
+                power: stats.power / popIndexValue * 100,
+                popularity: stats.popularity / popIndexValue * 100,
+                fancy: stats.fancy / popIndexValue * 100
+
             });
         })
+};
+
+exports.popIndexHistory = function (req, res) {
+    var user = req.user;
+    return Stats.history_byUser(user).then(function (history) {
+        var response = [];
+        history.forEach(function (value) {
+            response.push({
+                year: value._id.year,
+                month: value._id.month,
+                day: value._id.day,
+                stats: value.stats
+            })
+        });
+        res.jsonp(response);
+    })
+};
+
+exports.find = function (req, res) {
+    console.log(req.search)
+    console.log(req.body)
+    console.log(req.query)
+    var user = req.user;
+    req.assert('search', 'You must enter a name').notEmpty();
+    var errors = req.validationErrors();
+    if (errors) {
+        return res.status(400).send(errors);
+    }
+
+    User.find_byName(req.body.search)
+        .then(function (results) {
+            if (results.results.length == 0)
+                return res.jsonp({
+                    success: true,
+                    results: []
+                });
+            var distanceQueuePromises = [];
+            var response = [];
+            results.results.forEach(function (value) {
+                var userFound = value.obj;
+                response.push({
+                    personal: userFound.personal,
+                    tags: userFound.tags,
+                    distance: null,
+                    popIndex: userFound.statsGet().total
+                });
+                userFound.statsCalculator().total();
+                distanceQueuePromises.push(user.distance(userFound));
+            });
+            return Q.all(distanceQueuePromises)
+                .then(function (values) {
+                    var i = 0;
+                    values.forEach(function (dist) {
+                        console.log(i, response[i]);
+                        response[i++].distance = dist;
+                    });
+                    res.jsonp({
+                        success: true,
+                        results: response
+                    });
+                })
+        });
 };

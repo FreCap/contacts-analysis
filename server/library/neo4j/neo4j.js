@@ -73,9 +73,9 @@ exports.contactsThatCanReachOld = function (from, to, success) {
                     if (nLevel > 0 && nLevel < nLevelOriginal + 2) {
                         contactsPossible.push(contact.name);
                     }
-                    console.log(nSucceed + "/" + contacts.length)
+//                    console.log(nSucceed + "/" + contacts.length)
                     if (nSucceed > contacts.length - 5) {
-                        console.log("What the fuck" + contactsPossible.length);
+//                        console.log("What the fuck" + contactsPossible.length);
                         console.timeEnd("contactsThatCanReachOld");
 
                         success(contactsPossible);
@@ -199,7 +199,7 @@ var peopleReachable_byLevelQuery_byDirection = function (from, level, dir, count
     else
         query += util.format('return f%s', level);
 
-    console.log(query);
+//    console.log(query);
     return query;
 };
 

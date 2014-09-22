@@ -75,7 +75,7 @@ UserSchema = new Schema({
 
 UserSchema.plugin(textSearch);
 UserSchema.index(
-    { tags: 'text' }
+    { tags: 'text', "personal.name": 'text', "personal.surname": 'text', "personal.city": 'text' }
 );
 
 
@@ -110,7 +110,11 @@ UserSchema.pre('remove', function (next) {
         })
         .then(function () {
             return Contact.remove_byUser(user)
-        }).then(function () {
+        })
+        .then(function () {
+            return Stats.remove_byUser(user)
+        })
+        .then(function () {
             next();
         });
 });
@@ -378,6 +382,7 @@ UserSchema.methods = {
         return neo4j.countLevels(this.nodeId, to.nodeId);
     },
     popIndex: function () {
+        // @DEPRECATED
         return neo4j.countPeopleReachMe(this.nodeId)
             .then(function (values) {
                 return math.pow(values[0], 2)
@@ -393,7 +398,8 @@ UserSchema.methods = {
             wanted: computed.wanted ? computed.wanted : 0,
             power: computed.power ? computed.power : 0,
             popularity: computed.popularity ? computed.popularity : 0,
-            fancy: computed.wanted ? computed.fancy : 0
+            fancy: computed.wanted ? computed.fancy : 0,
+            total: computed.total ? computed.total : 0
         }
     },
     statsCalculator: function () {
@@ -461,7 +467,10 @@ UserSchema.methods = {
             },
             fancy: function () {
                 //FANCY(N):= WANTED(N) / POPULARITY(N)
-                user.stats.computed.fancy = math.pow(user.statsGet().wanted, 3) / user.statsGet().popularity;
+                if (user.statsGet().popularity == 0)
+                    user.stats.computed.fancy = 0;
+                else
+                    user.stats.computed.fancy = math.pow(user.statsGet().wanted, 3) / user.statsGet().popularity;
                 return Q.ninvoke(user, "save")
                     .then(function () {
                         return user.stats.computed.fancy;
@@ -509,6 +518,12 @@ UserSchema.statics.find_byPhoneNumber = function (phoneNumber, callback, callbac
         }
     })
 };
+
+UserSchema.statics.find_byName = function (name) {
+    var deferred = Q.defer();
+    User.textSearch(name, deferred.makeNodeResolver());
+    return deferred.promise;
+}
 
 
 User = mongoose.model('User', UserSchema);
