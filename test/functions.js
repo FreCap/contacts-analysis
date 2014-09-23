@@ -15,7 +15,7 @@ var usersModel = [
         phoneNumber: '+393484650470',
         password: 'p',
         confirmPassword: 'p',
-        tags:["exampletag1","all"]
+        tags: ["exampletag1", "all"]
     },
     {
         personal: {name: 'Secondo2', surname: "laura"},
@@ -23,7 +23,7 @@ var usersModel = [
         phoneNumber: '+393401405382',
         password: 'p',
         confirmPassword: 'p',
-        tags:["exampletag","all"]
+        tags: ["exampletag", "all"]
     },
     {
         personal: {name: 'Terzo3', surname: "mirco"},
@@ -31,7 +31,7 @@ var usersModel = [
         phoneNumber: '+393319149997',
         password: 'p',
         confirmPassword: 'p',
-        tags:["exampletag","all"]
+        tags: ["exampletag", "all"]
     },
     {
         personal: {name: 'Quarto4', surname: "vecchio"},
@@ -39,7 +39,15 @@ var usersModel = [
         phoneNumber: '+393396507813',
         password: 'p',
         confirmPassword: 'p',
-        tags:["all"]
+        tags: ["all"]
+    },
+    {
+        personal: {name: 'Quinto5', surname: "vecchio"},
+        email: 'test@test.com',
+        phoneNumber: '+390542665008',
+        password: 'p',
+        confirmPassword: 'p',
+        tags: ["all","ma"]
     }
 ];
 
@@ -74,7 +82,7 @@ module.exports.initUser = function (number) {
         })
 };
 
-module.exports.getUser = function (nId) {
+var getUser = module.exports.getUser = function (nId) {
     return usersInstance[nId];
 };
 
@@ -89,8 +97,53 @@ module.exports.removeUsers = function () {
                 return next(id - 1);
             });
     };
-
-    return next(usersInstance.length - 1)
+    return next(usersInstance.length - 1);
 }
 
+
+module.exports.addRelationships = function () {
+
+    var stubReq = [
+        {body: {contacts: JSON.stringify({
+            "vecchio": "+393319149997",
+            "lalla": "+393401405382"
+        })},
+            user: getUser(0)},
+        {body: {contacts: JSON.stringify({
+//                            "fre": "+393484650470",
+            "vecchio": "+393319149997"
+        })},
+            user: getUser(1)},
+        {body: {contacts: JSON.stringify({
+            "fre": "+393484650470",
+            "lalla": "+393401405382"
+        })},
+            user: getUser(2)},
+        {body: {contacts: JSON.stringify({
+            "fre": "+393484650470",
+            "vecchio": "+393319149997",
+            "lalla": "+393401405382"
+        })},
+            user: getUser(3)},
+        {body: {contacts: JSON.stringify({
+            "fre": "+393484650470",
+            "vecchio": "+393319149997",
+            "lalla": "+393401405382"
+        })},
+            user: getUser(4)}
+    ];
+    var stubRes = {
+        jsonp: function () {
+            return true;
+        }
+    }
+    return Q.all([
+            userController.syncContacts(stubReq[0], stubRes),
+            userController.syncContacts(stubReq[1], stubRes),
+            userController.syncContacts(stubReq[2], stubRes),
+            userController.syncContacts(stubReq[3], stubRes),
+            userController.syncContacts(stubReq[4], stubRes)
+        ])
+
+}
 // FLUSH MATCH (n:`users`) OPTIONAL MATCH (n)-[r]-() DELETE n,r

@@ -6,7 +6,7 @@ var paths = {
     css: ['public/**/css/*.css', '!public/system/lib/**', 'packages/**/public/**/css/*.css']
 };
 
-module.exports = function(grunt) {
+module.exports = function (grunt) {
 
     if (process.env.NODE_ENV !== 'production') {
         require('time-grunt')(grunt);
@@ -88,11 +88,20 @@ module.exports = function(grunt) {
             }
         },
         mochaTest: {
-            options: {
-                reporter: 'spec',
-                require: 'server.js'
+            test: {
+                options: {
+                    reporter: 'spec',
+                    require: 'server.js'
+                },
+                src: ['test/mocha/**/*.js']
             },
-            src: ['test/mocha/**/*.js']
+            create: {
+                options: {
+                    reporter: 'spec',
+                    require: 'server.js'
+                },
+                src: ['test/create/*.js']
+            }
         },
         env: {
             test: {
@@ -117,7 +126,11 @@ module.exports = function(grunt) {
     }
 
     //Test task.
-    grunt.registerTask('test', ['env:test', 'mochaTest'/*, 'karma:unit'*/]);
+    grunt.registerTask('create', ['env:test', 'mochaTest:create'/*, 'karma:unit'*/]);
+
+    //Test task.
+    grunt.registerTask('test', ['env:test', 'mochaTest:test'/*, 'karma:unit'*/]);
+
 
     // For Heroku users only.
     // Docs: https://github.com/linnovate/mean/wiki/Deploying-on-Heroku

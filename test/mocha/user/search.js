@@ -9,7 +9,7 @@ var should = require('should'),
     userController = require(global.__base + 'controllers/users'),
     Q = require('q'),
     util = require('util'),
-    functions = require('./functions');
+    functions = require('../../functions');
 
 //Globals
 var user, user2, user3, user4;
@@ -19,7 +19,7 @@ var user, user2, user3, user4;
 describe('<Unit Test>', function () {
     describe('Search:', function () {
         before(function (done) {
-            this.timeout(50000);
+            this.timeout(10000);
             functions.initUser(4).then(function () {
                 user = functions.getUser(0);
                 user2 = functions.getUser(1);

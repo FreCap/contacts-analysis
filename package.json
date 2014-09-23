@@ -31,7 +31,7 @@
     "compression": "~1.0.1",
     "connect-flash": "^0.1.1",
     "consolidate": "^0.10.0",
-    "collections": "latest",
+    "collections": "1.2.1",
     "cookie-parser": "~1.0.1",
     "dependable": "0.2.5",
     "errorhandler": "~1.0.0",
@@ -50,7 +50,7 @@
     "grunt-nodemon": "0.2.1",
     "load-grunt-tasks": "^0.4.0",
     "lodash": "^2.4.1",
-    "mathjs":"latest",
+    "mathjs":"0.25.0",
     "mean-connect-mongo": "0.4.3",
     "mean-logger": "0.0.1",
     "meanio": "0.4.x",
@@ -72,7 +72,7 @@
     "nodemailer": "^0.6.1",
     "buffertools": "^2.1.2",
     "q": "^1.0.1",
-    "mongoose-text-search":"latest"
+    "mongoose-text-search":"0.0.2"
   },
   "devDependencies": {
     "assetmanager": "^0.1.2",
