@@ -150,7 +150,7 @@ exports.syncContacts = function (req, res) {
 
 exports.popIndex = function (req, res) {
     var user = req.user;
-    return     user.statsCalculator().total()
+    return user.statsCalculator().total()
         .then(function (popIndexValue) {
             var stats = user.statsGet();
             return res.jsonp({
@@ -174,7 +174,7 @@ exports.popIndexHistory = function (req, res) {
                 year: value._id.year,
                 month: value._id.month,
                 day: value._id.day,
-                stats: value.stats
+                stats: value.getComputed()
             })
         });
         res.jsonp(response);

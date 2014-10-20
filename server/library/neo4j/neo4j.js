@@ -88,6 +88,48 @@ exports.contactsThatCanReachOld = function (from, to, success) {
 
 };
 
+
+/*
+ START me=node(53)
+ match (me)-[:HAS]->(other)
+ OPTIONAL MATCH pMutualFriends=(me)-[:HAS]->(mf)<-[:HAS]-(other)
+ RETURN other.name AS name,
+ count(DISTINCT pMutualFriends) AS mutualFriends
+ ORDER BY mutualFriends DESC
+ LIMIT 2
+ */
+
+exports.topMutualContacts = function (from) {
+    console.time("topMutualContacts");
+    var deferred = Q.defer();
+
+
+    Q.ninvoke(db, 'cypherQuery',
+            'START me=node(' + from + ')' +
+            'match (me)-[:HAS]->(other)' +
+            'OPTIONAL MATCH pMutualFriends=(me)-[:HAS]->(mf)<-[:HAS]-(other)' +
+            'RETURN other AS name,' +
+            '    count(DISTINCT pMutualFriends) AS mutualFriends' +
+            'ORDER BY mutualFriends DESC' +
+            'LIMIT 2')
+        .then(function (err, result) {
+            if (err) throw err;
+            console.timeEnd("topMutualContacts");
+
+            var response = [];
+            result.data.forEach(function (v) {
+                response.push({
+                    nodeId: v[0],
+                    dist: v[1]
+                });
+            });
+            deferred.resolve(response);
+        });
+
+    return deferred.promise;
+};
+
+
 exports.contactsThatCanReach = function (from, to) {
     console.time("contactsThatCanReach");
     var deferred = Q.defer();
@@ -159,15 +201,17 @@ exports.removeNode = function (nodeId) {
 
 exports.addRel = function (from, to) {
     var deferred = Q.defer();
-
     db.insertRelationship(from, to, 'HAS', {}, function (err, relationship) {
-        if (err) throw err;
+        if (err) {
+            console.log("Error: ADDING RELATIONSHIP: " + from + " -> " + to)
+            throw err;
+        }
         deferred.resolve(relationship.data);
     });
     return deferred.promise;
 };
 
-exports.getContacts = function (from) {
+exports.getContactsNames = function (from) {
     var deferred = Q.defer();
     db.cypherQuery('START s=node(' + from + ') ' +
         'match s-[:HAS]->x ' +
@@ -177,6 +221,22 @@ exports.getContacts = function (from) {
         // delivers an array of relationship objects.
     });
     return deferred.promise;
+};
+
+exports.getContactsNodeId = function (from) {
+    var deferred = Q.defer();
+    db.cypherQuery('START s=node(' + from + ') ' +
+        'match s-[:HAS]->x ' +
+        'return x', function (err, relationships) {
+        if (err) throw err;
+        var response = [];
+        relationships.data.forEach(function (node) {
+            response.push(node._id);
+        });
+        deferred.resolve(response);
+        // delivers an array of relationship objects.
+    });
+    return deferred.promise
 };
 
 
@@ -246,23 +306,23 @@ exports.countPeopleReachable = function (from) {
 
 var peopleReachIntersectionsMe = function (from, direction) {
     return Q.all([
-            peopleReachable_byLevel(from, 1, direction, false),
-            peopleReachable_byLevel(from, 2, direction, false)
-        ]).spread(function (leve11, level2) {
-            var level1Set = new Set();
-            var level2Set = new Set();
+        peopleReachable_byLevel(from, 1, direction, false),
+        peopleReachable_byLevel(from, 2, direction, false)
+    ]).spread(function (leve11, level2) {
+        var level1Set = new Set();
+        var level2Set = new Set();
 
-            level2.forEach(function (node) {
-                level2Set.add(node._id);
-            })
-            leve11.forEach(function (node) {
-                level2Set.remove(node._id);
-                level1Set.add(node._id);
-            })
-            level2Set.remove(from);
-            level1Set.remove(from);
-            return [level1Set,level2Set];
+        level2.forEach(function (node) {
+            level2Set.add(node._id);
         });
+        leve11.forEach(function (node) {
+            level2Set.remove(node._id);
+            level1Set.add(node._id);
+        });
+        level2Set.remove(from);
+        level1Set.remove(from);
+        return [level1Set, level2Set];
+    });
 };
 
 

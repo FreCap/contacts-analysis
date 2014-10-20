@@ -6,25 +6,33 @@ var Q = require('q')
 
 var mongoose = require('mongoose'),
     User = mongoose.model('User'),
-Stats = mongoose.model('Stats');
+    Stats = mongoose.model('Stats'),
+    cUtils =  require(__base + 'library/cUtils');
+
 exports.render = function (req, res) {
+console.log(cUtils);
+    console.log(cUtils.descendants({rank:{s:"asd",g:"asd"}, b:2, c:"asda",y:{q:['1']}}, 'rank'));
+//    Q.ninvoke(User, "findOne", {nodeId:54}).then(function (user) {
+//        Q.ninvoke(User, "findOne", {nodeId:54}).then(function (user) {
+//            user.statsCalculator().averageContactsIndex().then(function(a){
+//                console.log(a);
+//            });
+//        })
+//    })
 
+//    User.find_byStatslastUpdated().then(function (users) {
+//        console.log("ASDASDSAD")
+//
+//        users.forEach(function (a) {
+//            console.log("1");
+//
+//            a.statsCalculator().total().then(function (b) {
+//                console.log(b);
+//            });
+//        });
+//    })
 
-    User.find_byPhoneNumber("+393401405382", function (user) {
-        Stats.history_byUser(user).then(function (history) {
-            var response = [];
-            history.forEach(function (value) {
-                response.push({
-                    year: value._id.year,
-                    month: value._id.month,
-                    day: value._id.day,
-                    stats: value.stats
-                })
-            });
-            res.jsonp(response);
-        })
-
-    })
+    //  user.statsCalculator().total()
 
     // Send some basic starting info to the view
 

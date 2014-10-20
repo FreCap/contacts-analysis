@@ -47,7 +47,7 @@ var usersModel = [
         phoneNumber: '+390542665008',
         password: 'p',
         confirmPassword: 'p',
-        tags: ["all","ma"]
+        tags: ["all", "ma"]
     }
 ];
 
@@ -138,12 +138,12 @@ module.exports.addRelationships = function () {
         }
     }
     return Q.all([
-            userController.syncContacts(stubReq[0], stubRes),
-            userController.syncContacts(stubReq[1], stubRes),
-            userController.syncContacts(stubReq[2], stubRes),
-            userController.syncContacts(stubReq[3], stubRes),
-            userController.syncContacts(stubReq[4], stubRes)
-        ])
+        userController.syncContacts(stubReq[0], stubRes),
+        userController.syncContacts(stubReq[1], stubRes),
+        userController.syncContacts(stubReq[2], stubRes),
+        userController.syncContacts(stubReq[3], stubRes),
+        userController.syncContacts(stubReq[4], stubRes)
+    ])
 
 }
 // FLUSH MATCH (n:`users`) OPTIONAL MATCH (n)-[r]-() DELETE n,r

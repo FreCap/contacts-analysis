@@ -15,12 +15,25 @@ var Stats;
  */
 var StatsSchema = new Schema({
     stats: {
-        wanted: Number,
-        power: Number,
-        popularity: Number,
-        fancy: Number,
-        total: Number,
-        lastUpdate: Date
+        computed: {
+            wanted: Number,
+            power: Number,
+            popularity: Number,
+            fancy: Number,
+            total: Number,
+            lastUpdate: Date
+        },
+        searched: Number,
+        peopleReachable: {
+            countStep1: Number,
+            countStep2: Number,
+            lastUpdate: Date
+        },
+        peopleReachMe: {
+            countStep1: Number,
+            countStep2: Number,
+            lastUpdate: Date
+        }
     },
     created: {
         type: Date,
@@ -31,6 +44,22 @@ var StatsSchema = new Schema({
         ref: 'User'
     }
 });
+
+
+StatsSchema.methods = {
+    getComputed: function () {
+        var stat = this,
+            computed = stat.stats.computed;
+        return {
+            wanted: computed.wanted ? computed.wanted : 0,
+            power: computed.power ? computed.power : 0,
+            popularity: computed.popularity ? computed.popularity : 1,
+            fancy: computed.wanted ? computed.fancy : 0,
+            total: computed.total ? computed.total : 0
+        }
+    }
+}
+
 
 StatsSchema.statics.history_byUser = function (user) {
     var deferred = Q.defer();
@@ -58,6 +87,20 @@ StatsSchema.statics.history_byUser = function (user) {
     ], deferred.makeNodeResolver());
     return deferred.promise;
 };
+
+
+StatsSchema.statics.find_last_byUser = function (user) {
+    var deferred = Q.defer();
+    Stats.findOne()
+        .sort({"created": 'desc'})
+        .exec(function (err, stat) {
+            if (err)
+                return err;
+            return deferred.resolve(stat);
+        });
+    return deferred.promise;
+};
+
 
 StatsSchema.statics.remove_byUser = function (user) {
     return Q.ninvoke(this, "remove",

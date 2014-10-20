@@ -28,6 +28,10 @@ UserSchema = new Schema({
         required: true,
         unique: true
     },
+    phoneHash: {
+        type: String,
+        unique: true
+    },
     nodeId: Number,
     email: String,
     token: String,
@@ -49,7 +53,30 @@ UserSchema = new Schema({
     },
     providers: {},
     stats: {
+        ranks: {
+            computed: {
+                averageContactsIndex: Number,
+                wanted: Number,
+                power: Number,
+                popularity: Number,
+                fancy: Number,
+                total: Number,
+                lastUpdate: Date
+            },
+            searched: Number,
+            peopleReachable: {
+                countStep1: Number,
+                countStep2: Number,
+                lastUpdate: Date
+            },
+            peopleReachMe: {
+                countStep1: Number,
+                countStep2: Number,
+                lastUpdate: Date
+            }
+        },
         computed: {
+            averageContactsIndex: Number,
             wanted: Number,
             power: Number,
             popularity: Number,
@@ -68,7 +95,6 @@ UserSchema = new Schema({
             countStep2: Number,
             lastUpdate: Date
         }
-
     }
 });
 
@@ -191,9 +217,49 @@ var popIndexAggregate = function (nodesId, sommatoriaOf) {
             }
         }
     ], deferred.makeNodeResolver());
-
     return deferred.promise;
-}
+};
+
+var RANK_ORDER_GREATER = 1;
+var RANK_ORDER_LESSER = 2;
+
+var rankPosition = function (nodesId, parameter, value, order) {
+    var deferred = Q.defer();
+    var query = User.in(nodesId);
+    if (order == RANK_ORDER_GREATER)
+        query = query.where(parameter, { qty: { $gt: value } });
+    else
+        query = query.where(parameter, { qty: { $lt: value } });
+    query.count(deferred.makeNodeResolver());
+    return deferred.promise;
+};
+
+var topOfNodes = function (nodesId, parameter) {
+    // es parameter = "stats.peopleReachable.countStep2"
+    var deferred = Q.defer();
+    User.aggregate([
+        {"$match": {nodeId: {$in: nodesId}}},
+        { $sort: {parameter: 1 } },
+        { $limit: 5 }
+    ], deferred.makeNodeResolver());
+    return deferred.promise;
+};
+
+var averageOfNodes = function (nodesId, parameter) {
+    // es parameter = "$stats.computed.total"
+    var deferred = Q.defer();
+    User.aggregate([
+        {"$match": {nodeId: {$in: nodesId}}},
+        { $group: {
+            _id: null,
+            avg: { $avg: '$' + parameter }
+        }}
+    ], function (err, avg) {
+        if (err)deferred.reject(new Error(err));
+        deferred.resolve(avg[0].avg)
+    });
+    return deferred.promise;
+};
 
 /**
  * Instance methods
@@ -226,7 +292,6 @@ UserSchema.methods = {
                         })
                         .then(verified);
                 }
-
                 return verified;
             });
 
@@ -269,10 +334,13 @@ UserSchema.methods = {
             });
     },
     // ################### CONTACTS ###################
-    fetchContacts: function () {
+    fetchContactsNames: function () {
         var user = this;
-
-        return neo4j.getContacts(user.nodeId);
+        return neo4j.getContactsNames(user.nodeId);
+    },
+    fetchContactsNodeId: function () {
+        var user = this;
+        return neo4j.getContactsNodeId(user.nodeId);
     },
     addToNeo: function () {
         var user = this;
@@ -331,7 +399,7 @@ UserSchema.methods = {
         var deferred = Q.defer()
         var user = this;
         var contactsToDelete = [];
-        this.fetchContacts()
+        this.fetchContactsNames()
             .then(function (currentContacts) {
                 // controllo gli utenti che c'erano e adesso non ci son più
                 currentContacts.forEach(function (v) {
@@ -364,19 +432,19 @@ UserSchema.methods = {
     updateInContactsStats: function () {
         var user = this;
         return Q.all([neo4j.peopleReachable(user.nodeId)
+            .spread(function (level1, level2) {
+                user.stats.peopleReachable.countStep1 = level1.length;
+                user.stats.peopleReachable.countStep2 = level2.length;
+            })
+            , neo4j.peopleReachMe(user.nodeId)
                 .spread(function (level1, level2) {
-                    user.stats.peopleReachable.countStep1 = level1.length;
-                    user.stats.peopleReachable.countStep2 = level2.length;
-                })
-                , neo4j.peopleReachMe(user.nodeId)
-                    .spread(function (level1, level2) {
-                        user.stats.peopleReachMe.countStep1 = level1.length;
-                        user.stats.peopleReachMe.countStep2 = level2.length;
+                    user.stats.peopleReachMe.countStep1 = level1.length;
+                    user.stats.peopleReachMe.countStep2 = level2.length;
 
-                    })
-            ]).then(function () {
-                return Q.ninvoke(user, "save");
-            });
+                })
+        ]).then(function () {
+            return Q.ninvoke(user, "save");
+        });
     },
     distance: function (to) {
         return neo4j.countLevels(this.nodeId, to.nodeId);
@@ -395,6 +463,7 @@ UserSchema.methods = {
         var user = this,
             computed = user.stats.computed;
         return {
+            averageContactsIndex : computed.averageContactsIndex ? computed.averageContactsIndex : 0,
             wanted: computed.wanted ? computed.wanted : 0,
             power: computed.power ? computed.power : 0,
             popularity: computed.popularity ? computed.popularity : 0,
@@ -405,6 +474,18 @@ UserSchema.methods = {
     statsCalculator: function () {
         var user = this;
         return {
+            averageContactsIndex: function () {
+                return user.fetchContactsNodeId()
+                    .then(function (nodesId) {
+                        return averageOfNodes(nodesId, "stats.computed.total")
+                    }).
+                    then(function (average) {
+                        user.stats.computed.averageContactsIndex = parseInt(average);
+                        return Q.ninvoke(user, "save");
+                    }) .then(function () {
+                        return user.stats.computed.averageContactsIndex;
+                    });
+            },
             wanted: function () {
                 //quando mi cercano
 
@@ -418,28 +499,27 @@ UserSchema.methods = {
                         user.stats.peopleReachable.countStep2 = level2.length;
                         console.log("all done")
                         return Q.all([
-                                popIndexAggregate(level1.toArray(),
-                                    {"$multiply": ["$stats.peopleReachable.countStep1"
-                                        , {"$add": [1,
-                                            {"$ifNull": [ "$stats.searched", 0]}
-                                        ]}
-                                    ]}),
-                                popIndexAggregate(level2.toArray(),
-                                    {"$multiply": ["$stats.peopleReachable.countStep2"
-                                        , {"$add": [1,
-                                            {"$ifNull": [ "$stats.searched", 0]}
-                                        ]}
-                                    ]})
-                            ]).spread(function (level1Options, level2Options) {
-                                var level1Index = level1Options.length ? level1Options[0].total : 0,
-                                    level2Index = level2Options.length ? level2Options[0].total : 0;
+                            popIndexAggregate(level1.toArray(),
+                                {"$multiply": ["$stats.peopleReachable.countStep1"
+                                    , {"$add": [1,
+                                        {"$ifNull": [ "$stats.searched", 0]}
+                                    ]}
+                                ]}),
+                            popIndexAggregate(level2.toArray(),
+                                {"$multiply": ["$stats.peopleReachable.countStep2"
+                                    , {"$add": [1,
+                                        {"$ifNull": [ "$stats.searched", 0]}
+                                    ]}
+                                ]})
+                        ]).spread(function (level1Options, level2Options) {
+                            var level1Index = level1Options.length ? level1Options[0].total : 0,
+                                level2Index = level2Options.length ? level2Options[0].total : 0;
 
-                                user.stats.computed.power = level1Index + math.sqrt(level2Index);
-                                return Q.ninvoke(user, "save")
-                                    .then(function () {
-                                        return user.stats.computed.power;
-                                    });
-                            });
+                            user.stats.computed.power = level1Index + math.sqrt(level2Index);
+                            return Q.ninvoke(user, "save");
+                        }).then(function () {
+                            return user.stats.computed.power;
+                        });
                     });
             },
             popularity: function () {
@@ -449,20 +529,20 @@ UserSchema.methods = {
                         user.stats.peopleReachMe.countStep1 = level1.length;
                         user.stats.peopleReachMe.countStep2 = level2.length;
                         return Q.all([
-                                popIndexAggregate(level1.toArray(),
-                                    "$stats.peopleReachMe.countStep1"),
-                                popIndexAggregate(level2.toArray(),
-                                    "$stats.peopleReachMe.countStep2")
+                            popIndexAggregate(level1.toArray(),
+                                "$stats.peopleReachMe.countStep1"),
+                            popIndexAggregate(level2.toArray(),
+                                "$stats.peopleReachMe.countStep2")
 
-                            ]).spread(function (level1Options, level2Options) {
-                                var level1Index = level1Options.length ? level1Options[0].total : 0,
-                                    level2Index = level2Options.length ? level2Options[0].total : 0;
-                                user.stats.computed.popularity = level1Index + math.sqrt(level2Index);
-                                return Q.ninvoke(user, "save")
-                                    .then(function () {
-                                        return user.stats.computed.popularity;
-                                    });
-                            });
+                        ]).spread(function (level1Options, level2Options) {
+                            var level1Index = level1Options.length ? level1Options[0].total : 0,
+                                level2Index = level2Options.length ? level2Options[0].total : 0;
+                            user.stats.computed.popularity = level1Index + math.sqrt(level2Index);
+                            return Q.ninvoke(user, "save")
+                                .then(function () {
+                                    return user.stats.computed.popularity;
+                                });
+                        });
                     });
             },
             fancy: function () {
@@ -479,28 +559,30 @@ UserSchema.methods = {
             total: function () {
                 //RI(N) = WANTED(N) + POWER(N) +POPULARITY(N)+FANCY(N)
                 return Q.all([
-                        user.statsCalculator().wanted(),
-                        user.statsCalculator().power(),
-                        user.statsCalculator().popularity(),
-                        user.statsCalculator().fancy()
-                    ]).then(function () {
-                        user.stats.computed.total = user.statsGet().wanted
-                            + user.statsGet().power
-                            + user.statsGet().popularity
-                            + user.statsGet().fancy;
-                        user.stats.computed.lastUpdate = Date.now();
-                        var stats = new Stats({
-                            stats: user.statsGet(),
-                            user: user
+                    user.statsCalculator().wanted(),
+                    user.statsCalculator().power(),
+                    user.statsCalculator().popularity(),
+                    user.statsCalculator().fancy()
+                ]).then(function () {
+                    user.stats.computed.total = user.statsGet().wanted
+                        + user.statsGet().power
+                        + user.statsGet().popularity
+                        + user.statsGet().fancy;
+                    user.stats.computed.lastUpdate = Date.now();
+                    console.log(user.stats);
+                    var stats = new Stats({
+                        stats: JSON.parse(JSON.stringify(user.stats)),
+                        user: user
+                    })
+                    console.log(stats);
+                    return Q.ninvoke(user, "save").
+                        then(function () {
+                            return Q.ninvoke(stats, "save");
                         })
-                        return Q.ninvoke(user, "save").
-                            then(function () {
-                                return Q.ninvoke(stats, "save");
-                            })
-                            .then(function () {
-                                return user.stats.computed.total;
-                            });
-                    });
+                        .then(function () {
+                            return user.stats.computed.total;
+                        });
+                });
             }
         }
     }
@@ -523,7 +605,20 @@ UserSchema.statics.find_byName = function (name) {
     var deferred = Q.defer();
     User.textSearch(name, deferred.makeNodeResolver());
     return deferred.promise;
-}
+};
 
+UserSchema.statics.find_byStatslastUpdated = function () {
+    var deferred = Q.defer();
+    this.find()
+        .sort({"stats.compute.lastUpdate": 'asc'})
+        .limit(20)
+        .exec(function (err, users) {
+            if (err)
+                return err;
+            return deferred.resolve(users);
+        });
+
+    return deferred.promise;
+};
 
 User = mongoose.model('User', UserSchema);
