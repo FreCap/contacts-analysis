@@ -55,6 +55,10 @@ module.exports = function (grunt) {
             dev: {
                 NODE_ENV: 'development',
                 PORT: 3000
+            },
+            create: {
+                NODE_ENV: 'development',
+                PORT: 3002
             }
         },
         uglify: {
@@ -132,7 +136,7 @@ module.exports = function (grunt) {
     }
 
     //Test task.
-    grunt.registerTask('create', ['env:test', 'mochaTest:create'/*, 'karma:unit'*/]);
+    grunt.registerTask('create', ['env:create', 'mochaTest:create'/*, 'karma:unit'*/]);
 
     //Test task.
     grunt.registerTask('test', ['env:test', 'mochaTest:test'/*, 'karma:unit'*/]);

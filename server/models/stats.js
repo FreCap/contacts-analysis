@@ -15,23 +15,46 @@ var Stats;
  */
 var StatsSchema = new Schema({
     stats: {
+        ranks: {
+            computed: {
+                averageContactsIndex: {type: Number, default: 0},
+                wanted: {type: Number, default: 0},
+                power: {type: Number, default: 0},
+                popularity: {type: Number, default: 0},
+                fancy: {type: Number, default: 0},
+                total: {type: Number, default: 0},
+                lastUpdate: Date
+            },
+            searched: {type: Number, default: 0},
+            peopleReachable: {
+                countStep1: {type: Number, default: 0},
+                countStep2: {type: Number, default: 0},
+                lastUpdate: Date
+            },
+            peopleReachMe: {
+                countStep1: {type: Number, default: 0},
+                countStep2: {type: Number, default: 0},
+                lastUpdate: Date
+            }
+        },
         computed: {
-            wanted: Number,
-            power: Number,
-            popularity: Number,
-            fancy: Number,
-            total: Number,
+            averageContactsIndex: {type: Number, default: 0},
+            wanted: {type: Number, default: 0},
+            power: {type: Number, default: 0},
+            popularity: {type: Number, default: 0},
+            fancy: {type: Number, default: 0},
+            total: {type: Number, default: 0},
             lastUpdate: Date
         },
-        searched: Number,
+        searched: {type: Number, default: 0},
         peopleReachable: {
-            countStep1: Number,
-            countStep2: Number,
+            countStep1: {type: Number, default: 0},
+            countStep2: {type: Number, default: 0},
             lastUpdate: Date
         },
         peopleReachMe: {
-            countStep1: Number,
-            countStep2: Number,
+            countStep1: {type: Number, default: 0},
+            countStep2: {type: Number, default: 0},
             lastUpdate: Date
         }
     },

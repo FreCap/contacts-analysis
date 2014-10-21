@@ -57,23 +57,23 @@ UserSchema = new Schema({
     stats: {
         ranks: {
             computed: {
-                averageContactsIndex: Number,
-                wanted: Number,
-                power: Number,
-                popularity: Number,
-                fancy: Number,
-                total: Number,
+                averageContactsIndex: {type: Number, default: 0},
+                wanted: {type: Number, default: 0},
+                power: {type: Number, default: 0},
+                popularity: {type: Number, default: 0},
+                fancy: {type: Number, default: 0},
+                total: {type: Number, default: 0},
                 lastUpdate: Date
             },
-            searched: Number,
+            searched: {type: Number, default: 0},
             peopleReachable: {
-                countStep1: Number,
-                countStep2: Number,
+                countStep1: {type: Number, default: 0},
+                countStep2: {type: Number, default: 0},
                 lastUpdate: Date
             },
             peopleReachMe: {
-                countStep1: Number,
-                countStep2: Number,
+                countStep1: {type: Number, default: 0},
+                countStep2: {type: Number, default: 0},
                 lastUpdate: Date
             }
         },
@@ -86,7 +86,7 @@ UserSchema = new Schema({
             total: {type: Number, default: 0},
             lastUpdate: Date
         },
-        searched:  {type: Number, default: 0},
+        searched: {type: Number, default: 0},
         peopleReachable: {
             countStep1: {type: Number, default: 0},
             countStep2: {type: Number, default: 0},
@@ -487,10 +487,10 @@ UserSchema.methods = {
                             var currentVal = cUtils.reflectionGet(user.stats, stat);
                             queries.push(rankPosition(nodesId, 'stats.' + stat, currentVal, RANK_ORDER_GREATER)
                                 .then(function (value) {
-                                    cUtils.reflectionSet(user.stats, stat, value);
+                                    cUtils.reflectionSet(user.stats.ranks, stat, value);
+
                                 }));
                         });
-
                         return Q.all(queries);
                     }).then(function () {
                         return Q.ninvoke(user, "save");
@@ -594,13 +594,17 @@ UserSchema.methods = {
                         stats: JSON.parse(JSON.stringify(user.stats)),
                         user: user
                     })
-                    return Q.ninvoke(user, "save").
-                        then(function () {
+                    return Q.ninvoke(user, "save")
+                        .then(function () {
                             return Q.ninvoke(stats, "save");
                         })
-                        .then(function () {
-                            return user.stats.computed.total;
-                        });
+
+                }).then(function () {
+                    return  Q.all([
+                        user.statsCalculator().averageContactsIndex(),
+                        user.statsCalculator().computeRanks()]);
+                }).then(function () {
+                    return user.stats.computed.total;
                 });
             }
         }
