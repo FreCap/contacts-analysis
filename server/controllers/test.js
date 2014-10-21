@@ -7,18 +7,16 @@ var Q = require('q')
 var mongoose = require('mongoose'),
     User = mongoose.model('User'),
     Stats = mongoose.model('Stats'),
-    cUtils =  require(__base + 'library/cUtils');
+    cUtils = require(__base + 'library/cUtils');
 
 exports.render = function (req, res) {
-console.log(cUtils);
-    console.log(cUtils.descendants({rank:{s:"asd",g:"asd"}, b:2, c:"asda",y:{q:['1']}}, 'rank'));
-//    Q.ninvoke(User, "findOne", {nodeId:54}).then(function (user) {
-//        Q.ninvoke(User, "findOne", {nodeId:54}).then(function (user) {
-//            user.statsCalculator().averageContactsIndex().then(function(a){
-//                console.log(a);
-//            });
-//        })
-//    })
+    //console.log(cUtils);
+    Q.ninvoke(User, "findOne", {nodeId: 182}).then(function (user) {
+
+        user.statsCalculator().computeRanks().then(function (a) {
+            res.jsonp(a);
+        });
+    })
 
 //    User.find_byStatslastUpdated().then(function (users) {
 //        console.log("ASDASDSAD")
@@ -28,6 +26,7 @@ console.log(cUtils);
 //
 //            a.statsCalculator().total().then(function (b) {
 //                console.log(b);
+//                res.jsonp(req.body);
 //            });
 //        });
 //    })

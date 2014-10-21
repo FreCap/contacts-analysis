@@ -35,7 +35,6 @@ describe('<Unit Test>', function () {
 
                 User.find_byName("Primo1 fre")
                     .then(function (result) {
-                        console.log(result);
                         result.results.should.have.length(1);
                         done()
                     }).fail(function (err) {

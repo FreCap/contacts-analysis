@@ -182,9 +182,9 @@ exports.popIndexHistory = function (req, res) {
 };
 
 exports.find = function (req, res) {
-    console.log(req.search)
-    console.log(req.body)
-    console.log(req.query)
+//    console.log(req.search)
+//    console.log(req.body)
+//    console.log(req.query)
     var user = req.user;
     req.assert('search', 'You must enter a name').notEmpty();
     var errors = req.validationErrors();
@@ -216,7 +216,7 @@ exports.find = function (req, res) {
                 .then(function (values) {
                     var i = 0;
                     values.forEach(function (dist) {
-                        console.log(i, response[i]);
+//                        console.log(i, response[i]);
                         response[i++].distance = dist;
                     });
                     res.jsonp({

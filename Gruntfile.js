@@ -19,7 +19,8 @@ module.exports = function (grunt) {
         watch: {
             js: {
                 files: paths.js,
-                tasks: ['jshint'],
+                //tasks: ['jshint'],
+                tasks:['test'],
                 options: {
                     livereload: true
                 }
@@ -44,6 +45,16 @@ module.exports = function (grunt) {
                 options: {
                     jshintrc: true
                 }
+            }
+        },
+        env: {
+            test: {
+                NODE_ENV: 'test',
+                PORT: 3001
+            },
+            dev: {
+                NODE_ENV: 'development',
+                PORT: 3000
             }
         },
         uglify: {
@@ -75,7 +86,7 @@ module.exports = function (grunt) {
                     nodeArgs: ['--debug'],
                     delayTime: 1,
                     env: {
-                        PORT: require('./server/config/config').port
+                        PORT: 3000//require('./server/config/config').port
                     },
                     cwd: __dirname
                 }
@@ -103,11 +114,6 @@ module.exports = function (grunt) {
                 src: ['test/create/*.js']
             }
         },
-        env: {
-            test: {
-                NODE_ENV: 'test'
-            }
-        },
         karma: {
             unit: {
                 configFile: 'test/karma/karma.conf.js'
@@ -122,7 +128,7 @@ module.exports = function (grunt) {
     if (process.env.NODE_ENV === 'production') {
         grunt.registerTask('default', ['cssmin', 'uglify', 'concurrent']);
     } else {
-        grunt.registerTask('default', [/*'jshint', 'csslint', */'concurrent']);
+        grunt.registerTask('default', ['env:dev',/*'jshint', 'csslint', */'concurrent']);
     }
 
     //Test task.
@@ -131,6 +137,7 @@ module.exports = function (grunt) {
     //Test task.
     grunt.registerTask('test', ['env:test', 'mochaTest:test'/*, 'karma:unit'*/]);
 
+//    grunt.registerTask('watch', ['buildDev', 'test', 'concurrent']);
 
     // For Heroku users only.
     // Docs: https://github.com/linnovate/mean/wiki/Deploying-on-Heroku

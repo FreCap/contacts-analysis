@@ -14,6 +14,8 @@ var neo4j = require(__base + 'library/neo4j/neo4j');
 var ContactNotExist = mongoose.model('ContactNotExist');
 var Contact = mongoose.model('Contact');
 var Stats = mongoose.model('Stats');
+var cUtils = require(__base + 'library/cUtils');
+
 var mathjs = require('mathjs'),
     math = mathjs();
 
@@ -29,8 +31,8 @@ UserSchema = new Schema({
         unique: true
     },
     phoneHash: {
-        type: String,
-        unique: true
+        type: String
+        //unique: true
     },
     nodeId: Number,
     email: String,
@@ -76,28 +78,27 @@ UserSchema = new Schema({
             }
         },
         computed: {
-            averageContactsIndex: Number,
-            wanted: Number,
-            power: Number,
-            popularity: Number,
-            fancy: Number,
-            total: Number,
+            averageContactsIndex: {type: Number, default: 0},
+            wanted: {type: Number, default: 0},
+            power: {type: Number, default: 0},
+            popularity: {type: Number, default: 0},
+            fancy: {type: Number, default: 0},
+            total: {type: Number, default: 0},
             lastUpdate: Date
         },
-        searched: Number,
+        searched:  {type: Number, default: 0},
         peopleReachable: {
-            countStep1: Number,
-            countStep2: Number,
+            countStep1: {type: Number, default: 0},
+            countStep2: {type: Number, default: 0},
             lastUpdate: Date
         },
         peopleReachMe: {
-            countStep1: Number,
-            countStep2: Number,
+            countStep1: {type: Number, default: 0},
+            countStep2: {type: Number, default: 0},
             lastUpdate: Date
         }
     }
 });
-
 
 UserSchema.plugin(textSearch);
 UserSchema.index(
@@ -225,11 +226,12 @@ var RANK_ORDER_LESSER = 2;
 
 var rankPosition = function (nodesId, parameter, value, order) {
     var deferred = Q.defer();
-    var query = User.in(nodesId);
+    var query = User.where('nodeId').in(nodesId);
+    query = query.where(parameter);
     if (order == RANK_ORDER_GREATER)
-        query = query.where(parameter, { qty: { $gt: value } });
+        query = query.gt(value);
     else
-        query = query.where(parameter, { qty: { $lt: value } });
+        query = query.lt(value);
     query.count(deferred.makeNodeResolver());
     return deferred.promise;
 };
@@ -459,11 +461,12 @@ UserSchema.methods = {
                     + math.pow(values[3], 0.6);
             });
     },
+
     statsGet: function () {
         var user = this,
             computed = user.stats.computed;
         return {
-            averageContactsIndex : computed.averageContactsIndex ? computed.averageContactsIndex : 0,
+            averageContactsIndex: computed.averageContactsIndex ? computed.averageContactsIndex : 0,
             wanted: computed.wanted ? computed.wanted : 0,
             power: computed.power ? computed.power : 0,
             popularity: computed.popularity ? computed.popularity : 0,
@@ -474,6 +477,25 @@ UserSchema.methods = {
     statsCalculator: function () {
         var user = this;
         return {
+            computeRanks: function () {
+                Q.longStackSupport = true;
+                return user.fetchContactsNodeId()
+                    .then(function (nodesId) {
+                        var stats = cUtils.descendants(user.stats, ['rank', 'toObject', 'lastUpdate']);
+                        var queries = [];
+                        stats.forEach(function (stat) {
+                            var currentVal = cUtils.reflectionGet(user.stats, stat);
+                            queries.push(rankPosition(nodesId, 'stats.' + stat, currentVal, RANK_ORDER_GREATER)
+                                .then(function (value) {
+                                    cUtils.reflectionSet(user.stats, stat, value);
+                                }));
+                        });
+
+                        return Q.all(queries);
+                    }).then(function () {
+                        return Q.ninvoke(user, "save");
+                    });
+            },
             averageContactsIndex: function () {
                 return user.fetchContactsNodeId()
                     .then(function (nodesId) {
@@ -482,7 +504,7 @@ UserSchema.methods = {
                     then(function (average) {
                         user.stats.computed.averageContactsIndex = parseInt(average);
                         return Q.ninvoke(user, "save");
-                    }) .then(function () {
+                    }).then(function () {
                         return user.stats.computed.averageContactsIndex;
                     });
             },
@@ -497,7 +519,6 @@ UserSchema.methods = {
                     .spread(function (level1, level2) {
                         user.stats.peopleReachable.countStep1 = level1.length;
                         user.stats.peopleReachable.countStep2 = level2.length;
-                        console.log("all done")
                         return Q.all([
                             popIndexAggregate(level1.toArray(),
                                 {"$multiply": ["$stats.peopleReachable.countStep1"
@@ -569,12 +590,10 @@ UserSchema.methods = {
                         + user.statsGet().popularity
                         + user.statsGet().fancy;
                     user.stats.computed.lastUpdate = Date.now();
-                    console.log(user.stats);
                     var stats = new Stats({
                         stats: JSON.parse(JSON.stringify(user.stats)),
                         user: user
                     })
-                    console.log(stats);
                     return Q.ninvoke(user, "save").
                         then(function () {
                             return Q.ninvoke(stats, "save");

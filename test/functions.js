@@ -75,9 +75,9 @@ module.exports.initUser = function (number) {
     }
     return userController.create(stubReq1, stubRes, "")
         .then(function () {
-            return Q.ninvoke(User, "find", { phoneNumber: usersModel[number - 1].phoneNumber });
+            return Q.ninvoke(User, "findOne", { phoneNumber: usersModel[number - 1].phoneNumber });
         }).then(function (users) {
-            usersInstance.push(users[0]);
+            usersInstance.push(users);
             return Q.fcall(module.exports.initUser, number - 1);
         })
 };
