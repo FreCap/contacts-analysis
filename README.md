@@ -1,5 +1,5 @@
 
-# contact-analysis
+# contacts-analysis
 
 This server application want to simulate the "Six degrees of separation" 
 concept using the contacts of a mobile phone.
