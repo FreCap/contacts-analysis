@@ -4,16 +4,15 @@
 This server application want to simulate the "Six degrees of separation" 
 concept using the contacts of a mobile phone.
 The server analyzes your contacts and calculates a variety of parameters, for example:
-- how many people you can reach with n hop
+- how many people you can reach with n hops
 - how much are you central in your network
 - how much people could be interested in having your contact
-- an history about how these parameter changes
+- an history about how these parameter changed
 
 ## Tech
 
 Built on top of node.js and the mean stack
 Used both mongodb and neo4j for the contact analysis
-
 
 ### Android side
 
